@@ -1,0 +1,67 @@
+<!doctype html><html lang="ms"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin | Portal Sepak Takraw MSSM</title><link rel="stylesheet" href="style.css"></head><body>
+<header><div class="top"><div class="crest">🏐</div><div><h1>ADMIN PORTAL SEPAK TAKRAW</h1><p>PANEL PENGURUSAN KEJOHANAN</p></div></div></header>
+<nav><div class="navin"><a href="index.html">Lihat portal awam</a><a href="#dashboard">Dashboard</a><a href="#tahun">Tahun</a><a href="#pasukan">Pasukan</a><a href="#perlawanan">Keputusan</a><a href="#hebahan">Pengumuman</a></div></nav>
+<main>
+<div id="config"></div>
+<section class="panel" id="login"><h2 class="title">🔐 Log Masuk Admin</h2><p class="muted">Gunakan akaun yang telah didaftarkan dan diberikan peranan admin.</p><div class="row"><div class="field"><label>E-mel</label><input id="email" type="email" autocomplete="username"></div><div class="field"><label>Kata laluan</label><input id="password" type="password" autocomplete="current-password"></div></div><button class="btn" id="loginBtn">Log masuk</button><p id="loginMsg"></p></section>
+<div id="adminArea" class="hidden">
+<section class="panel"><div class="row"><div><h2 class="title" style="margin:0">Dashboard</h2><p id="who" class="muted"></p></div><button class="btn danger" id="logoutBtn" style="flex:0">Log keluar</button></div><div class="grid" style="margin-top:18px"><div class="stat"><b id="countTeams">0</b><span>Pasukan</span></div><div class="stat"><b id="countMatches">0</b><span>Perlawanan</span></div><div class="stat"><b id="countNews">0</b><span>Pengumuman</span></div></div></section>
+<section class="panel" id="tahun"><h2 class="title">📅 Pengurusan Tahun</h2><div class="row"><div class="field"><label>Tahun</label><input id="seasonYear" type="number" placeholder="2027"></div><div class="field"><label>Nama kejohanan</label><input id="seasonTitle" placeholder="Kejohanan Sepak Takraw MSSM"></div></div><label><input type="checkbox" id="seasonActive"> Jadikan tahun aktif</label><p><button class="btn" id="addSeason">Tambah tahun</button></p><div id="seasonList"></div></section>
+<section class="panel" id="pasukan"><h2 class="title">👥 Daftar Pasukan</h2><div class="field"><label>Tahun kejohanan</label><select id="teamSeason"></select></div><div class="row"><div class="field"><label>Nama pasukan / negeri</label><input id="teamName" placeholder="Contoh: Selangor"></div><div class="field"><label>Kod negeri (pilihan)</label><input id="teamState" placeholder="SGR"></div><div class="field"><label>Kategori</label><select id="teamCategory"><option>Bawah 12</option><option>Bawah 15</option><option>Bawah 18</option><option>Terbuka</option></select></div></div><button class="btn" id="addTeam">Simpan pasukan</button><div id="teamList"></div></section>
+<section class="panel" id="perlawanan"><h2 class="title">🏐 Rekod Keputusan</h2><div class="field"><label>Tahun kejohanan</label><select id="matchSeason"></select></div><div class="row"><div class="field"><label>Kategori</label><select id="matchCategory"><option>Bawah 12</option><option>Bawah 15</option><option>Bawah 18</option><option>Terbuka</option></select></div><div class="field"><label>Pusingan</label><input id="matchRound" placeholder="Contoh: Separuh Akhir"></div></div><div class="row"><div class="field"><label>Pasukan A</label><select id="teamA"></select></div><div class="field"><label>Pasukan B</label><select id="teamB"></select></div></div><div class="row"><div class="field"><label>Set Pasukan A</label><input id="setsA" type="number" min="0" value="0"></div><div class="field"><label>Set Pasukan B</label><input id="setsB" type="number" min="0" value="0"></div><div class="field"><label>Status</label><select id="matchStatus"><option>Akan Datang</option><option>Sedang Berlangsung</option><option>Tamat</option><option>Dibatalkan</option></select></div></div><div class="field"><label>Tarikh dan masa (pilihan)</label><input id="matchDate" type="datetime-local"></div><button class="btn" id="addMatch">Simpan keputusan</button><div id="matchList"></div></section>
+<section class="panel" id="hebahan"><h2 class="title">📢 Pengumuman</h2><div class="field"><label>Tahun kejohanan (pilihan)</label><select id="newsSeason"></select></div><div class="field"><label>Tajuk</label><input id="newsTitle"></div><div class="field"><label>Kandungan</label><textarea id="newsBody"></textarea></div><label><input type="checkbox" id="newsPublished"> Terbitkan kepada orang awam</label><p><button class="btn" id="addNews">Simpan pengumuman</button></p><div id="newsList"></div></section>
+<div class="notice">Fungsi pengurusan pegawai, album foto, pemain dan siaran langsung disediakan dalam struktur database. Modul borang tambahan boleh dibina selepas sambungan awal disahkan.</div>
+</div></main><footer>Panel Admin · Portal Sepak Takraw MSSM</footer>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="common.js"></script>
+<script>
+let currentSeason=null;
+function msg(el,s,cls=''){ $(el).className=cls;$(el).textContent=s; }
+async function isAdmin(){
+ const {data:{user}}=await db.auth.getUser();if(!user)return false;
+ const {data,error}=await db.from('profiles').select('role,display_name').eq('id',user.id).single();
+ if(error||data?.role!=='admin')return false;
+ $('#who').textContent='Log masuk sebagai '+(data.display_name||user.email)+' · Admin';
+ return true;
+}
+async function refresh(){
+ const {data:seasons}=await db.from('seasons').select('*').order('year',{ascending:false});
+ const opts=(seasons||[]).map(s=>`<option value="${s.id}">${esc(s.title)} (${s.year})</option>`).join('');
+ ['teamSeason','matchSeason','newsSeason'].forEach(id=>$( '#'+id).innerHTML=opts||'<option value="">Tambah tahun dahulu</option>');
+ const active=seasons?.find(s=>s.is_active)||seasons?.[0];if(active){currentSeason=active.id;['teamSeason','matchSeason','newsSeason'].forEach(id=>$('#'+id).value=active.id);}
+ $('#seasonList').innerHTML=seasons?.map(s=>`<p>${esc(s.title)} (${s.year}) ${s.is_active?'— <b>AKTIF</b>':''} <button class="btn light" onclick="activateSeason('${s.id}')">Aktifkan</button></p>`).join('')||'Belum ada tahun.';
+ await refreshTeams();await refreshMatches();await refreshNews();
+ const [t,m,n]=await Promise.all([db.from('teams').select('id',{count:'exact',head:true}),db.from('matches').select('id',{count:'exact',head:true}),db.from('announcements').select('id',{count:'exact',head:true})]);
+ $('#countTeams').textContent=t.count||0;$('#countMatches').textContent=m.count||0;$('#countNews').textContent=n.count||0;
+}
+window.activateSeason=async(id)=>{await db.from('seasons').update({is_active:false}).neq('id',id);await db.from('seasons').update({is_active:true}).eq('id',id);await refresh();};
+async function refreshTeams(){
+ const sid=$('#teamSeason').value||currentSeason;if(!sid)return;
+ const {data}=await db.from('teams').select('*').eq('season_id',sid).order('name');
+ $('#teamList').innerHTML=data?.length?`<table><tr><th>Pasukan</th><th>Kategori</th><th></th></tr>${data.map(t=>`<tr><td>${esc(t.name)}</td><td>${esc(t.category)}</td><td><button class="btn danger" onclick="delRow('teams','${t.id}')">Padam</button></td></tr>`).join('')}</table>`:'Tiada pasukan.';
+ const category=$('#matchCategory').value;$('#teamA').innerHTML=$('#teamB').innerHTML=(data||[]).filter(t=>t.category===category).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+}
+async function refreshMatches(){
+ const sid=$('#matchSeason').value||currentSeason;if(!sid)return;
+ const {data}=await db.from('matches').select('*,a:teams!matches_team_a_id_fkey(name),b:teams!matches_team_b_id_fkey(name)').eq('season_id',sid).order('created_at',{ascending:false}).limit(30);
+ $('#matchList').innerHTML=data?.length?`<table><tr><th>Perlawanan</th><th>Skor</th><th>Status</th><th></th></tr>${data.map(m=>`<tr><td>${esc(m.a?.name||'TBD')} vs ${esc(m.b?.name||'TBD')}</td><td>${m.sets_a}-${m.sets_b}</td><td>${esc(m.status)}</td><td><button class="btn danger" onclick="delRow('matches','${m.id}')">Padam</button></td></tr>`).join('')}</table>`:'Tiada perlawanan direkodkan.';
+}
+async function refreshNews(){
+ const sid=$('#newsSeason').value||currentSeason;if(!sid)return;
+ const {data}=await db.from('announcements').select('*').eq('season_id',sid).order('created_at',{ascending:false});
+ $('#newsList').innerHTML=data?.map(n=>`<p><b>${esc(n.title)}</b> · ${n.is_published?'Diterbitkan':'Draf'} <button class="btn danger" onclick="delRow('announcements','${n.id}')">Padam</button></p>`).join('')||'Tiada pengumuman.';
+}
+window.delRow=async(table,id)=>{if(confirm('Padam rekod ini?')){const {error}=await db.from(table).delete().eq('id',id);if(error)alert(error.message);await refresh();}};
+async function start(){
+ if(!db){$('#config').innerHTML=configWarning();$('#login').classList.add('hidden');return;}
+ $('#loginBtn').onclick=async()=>{const {error}=await db.auth.signInWithPassword({email:$('#email').value,password:$('#password').value});if(error){msg('#loginMsg',error.message,'error');return;}await checkSession();};
+ $('#logoutBtn').onclick=async()=>{await db.auth.signOut();location.reload();};
+ $('#addSeason').onclick=async()=>{const y=Number($('#seasonYear').value),title=$('#seasonTitle').value.trim();if(!y||!title)return alert('Isi tahun dan nama kejohanan.');if($('#seasonActive').checked)await db.from('seasons').update({is_active:false}).neq('year',y);const {error}=await db.from('seasons').insert({year:y,title,is_active:$('#seasonActive').checked});if(error)alert(error.message);await refresh();};
+ $('#addTeam').onclick=async()=>{const {error}=await db.from('teams').insert({season_id:$('#teamSeason').value,name:$('#teamName').value.trim(),state_code:$('#teamState').value.trim(),category:$('#teamCategory').value});if(error)alert(error.message);else{$('#teamName').value='';await refresh();}};
+ $('#teamSeason').onchange=refreshTeams;$('#matchSeason').onchange=refreshMatches;$('#newsSeason').onchange=refreshNews;$('#matchCategory').onchange=refreshTeams;
+ $('#addMatch').onclick=async()=>{const payload={season_id:$('#matchSeason').value,category:$('#matchCategory').value,round_name:$('#matchRound').value,team_a_id:$('#teamA').value||null,team_b_id:$('#teamB').value||null,sets_a:Number($('#setsA').value),sets_b:Number($('#setsB').value),status:$('#matchStatus').value,match_date:$('#matchDate').value?new Date($('#matchDate').value).toISOString():null};const {error}=await db.from('matches').insert(payload);if(error)alert(error.message);else await refresh();};
+ $('#addNews').onclick=async()=>{const {error}=await db.from('announcements').insert({season_id:$('#newsSeason').value||null,title:$('#newsTitle').value.trim(),body:$('#newsBody').value.trim(),is_published:$('#newsPublished').checked,published_at:$('#newsPublished').checked?new Date().toISOString():null});if(error)alert(error.message);else{$('#newsTitle').value='';$('#newsBody').value='';await refresh();}};
+ await checkSession();
+}
+async function checkSession(){const ok=await isAdmin();if(ok){$('#login').classList.add('hidden');$('#adminArea').classList.remove('hidden');await refresh();}else{$('#login').classList.remove('hidden');$('#adminArea').classList.add('hidden');}}
+start();
+</script></body></html>
